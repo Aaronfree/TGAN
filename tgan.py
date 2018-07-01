@@ -16,10 +16,13 @@ import matplotlib.gridspec as gridspec
 mb_size = 128
 
 # Dimension of the prior
-z_dim = 40
+z_dim = 10
 
 # Size of the hidden layer
 h_dim = 40
+
+
+n_dim = 40
 
 # Learning Rate
 lr = 5e-3
@@ -56,7 +59,17 @@ G_b_1 = tf.Variable(tf.zeros(shape=[28,28]))
 theta_G = [G_U_00, G_U_01, G_U_10, G_U_11, G_b_0, G_b_1]
 
 
+# Weight matrices and bias tensor forthe first and second tensor layer for the Encoder E
+E_U_00 = tf.Variable(normal_init([n_dim, 28]))
+E_U_01 = tf.Variable(normal_init([n_dim, 28]))
+E_b_0 = tf.Variable(tf.zeros(shape=[n_dim,n_dim]))
 
+E_U_10 = tf.Variable(normal_init([10, n_dim]))
+E_U_11 = tf.Variable(normal_init([10, n_dim]))
+E_b_1 = tf.Variable(tf.zeros(shape=[10,10]))
+
+# Parameters for generator
+theta_E = [E_U_00, E_U_01, E_U_10, E_U_11, E_b_0, E_b_1]
 
 def sample_z(shape):
     return np.random.uniform(-1., 1., size=shape)
@@ -72,6 +85,15 @@ def generator(z):
 
     return out
 
+def encoder(z):
+
+    # First Tensorized layer
+    out = tensor_layer(Z, [E_U_00, E_U_01], E_b_0, tf.nn.relu)
+
+    # Second Tensorized layer
+    out = tensor_layer(out, [E_U_10, E_U_11], E_b_1, tf.nn.sigmoid)
+
+    return out
 
 def discriminator(x):
     # First Tensorized layer
@@ -96,7 +118,7 @@ def plot(samples):
 
     return fig
 
-print("Total number of parameters: {}".format(get_number_parameters(theta_G+theta_D)))
+print("Total number of parameters: {}".format(get_number_parameters(theta_E+theta_G+theta_D)))
 
 G_sample = generator(Z)
 D_real, D_logit_real = discriminator(X)
@@ -107,11 +129,16 @@ D_fake, D_logit_fake = discriminator(G_sample)
 
 # Alternative losses:
 # -------------------
+
 D_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=D_logit_real, labels=tf.ones_like(D_logit_real)))
 D_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=D_logit_fake, labels=tf.zeros_like(D_logit_fake)))
 D_loss = D_loss_real + D_loss_fake
+
 G_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=D_logit_fake, labels=tf.ones_like(D_logit_fake)))
 
+#marginal_likelihood = -tf.reduce_mean(tf.reduce_mean(tf.squared_difference(Z,G_sample)))
+#theta_AE = [E_U_00, E_U_01, E_U_10, E_U_11, E_b_0, E_b_1,G_U_00, G_U_01, G_U_10, G_U_11, G_b_0, G_b_1]
+#AE_solver = tf.train.AdamOptimizer(learning_rate=lr, beta1=0.5).minimize(-  marginal_likelihood, var_list=theta_AE)
 D_solver = tf.train.AdamOptimizer(learning_rate=lr, beta1=0.5).minimize(D_loss, var_list=theta_D)
 G_solver = tf.train.AdamOptimizer(learning_rate=lr, beta1=0.5).minimize(G_loss, var_list=theta_G)
 
@@ -135,8 +162,8 @@ for it in range(1000000):
         plt.close(fig)
 
     X_mb, _ = mnist.train.next_batch(mb_size)
-
-    _, D_loss_curr = sess.run([D_solver, D_loss], feed_dict={X: X_mb.reshape(mb_size, 28, 28), Z: sample_z([mb_size, z_dim, z_dim])})
+    #_, loss_likelihood = sess.run( [AE_solver, - marginal_likelihood],feed_dict={X: X_mb.reshape(mb_size, 28, 28)})
+    _, D_loss_curr = sess.run([D_solver, D_loss],feed_dict={X: X_mb.reshape(mb_size, 28, 28), Z: sample_z([mb_size, z_dim, z_dim])})
     _, G_loss_curr = sess.run([G_solver, G_loss], feed_dict={Z: sample_z([mb_size, z_dim, z_dim])})
 
     if it % 1000 == 0:
