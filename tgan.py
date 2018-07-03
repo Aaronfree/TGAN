@@ -13,94 +13,72 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
 # Size of the batch
-mb_size = 128
+mb_size = 100
 
 # Dimension of the prior
-z_dim = 10
+#z_dim = 10
 
 # Size of the hidden layer
-h_dim = 40
+h_dim = 35
 
-
-n_dim = 40
+# Size of latent dim
+latent_dim = 15
 
 # Learning Rate
 lr = 5e-3
 
 # The input X
-X = tf.placeholder(tf.float32, shape=[None, 28, 28])
-
-# Weight matrices and bias tensor for the first and second tensor layer for the discriminator D
-D_U_00 = tf.Variable(normal_init([h_dim, 28]))
-D_U_01 = tf.Variable(normal_init([h_dim, 28]))
-D_b_0 = tf.Variable(tf.zeros(shape=[h_dim,h_dim]))
-
-D_U_10 = tf.Variable(normal_init([1, h_dim]))
-D_U_11 = tf.Variable(normal_init([1, h_dim]))
-D_b_1 = tf.Variable(tf.zeros(shape=[1,1]))
-
-# Parameters for discriminator
-theta_D = [D_U_00, D_U_01, D_U_10, D_U_11, D_b_0, D_b_1]
+x_hat = tf.placeholder(tf.float32, shape=[None,28, 28], name='input_img')
+x = tf.placeholder(tf.float32, shape=[None,28, 28], name='target_img')
 
 
-# Prior Z
-Z = tf.placeholder(tf.float32, shape=[None, z_dim, z_dim])
-
-# Weight matrices and bias tensor forthe first and second tensor layer for the generator G
-G_U_00 = tf.Variable(normal_init([h_dim, z_dim]))
-G_U_01 = tf.Variable(normal_init([h_dim, z_dim]))
-G_b_0 = tf.Variable(tf.zeros(shape=[h_dim,h_dim]))
-
-G_U_10 = tf.Variable(normal_init([28, h_dim]))
-G_U_11 = tf.Variable(normal_init([28, h_dim]))
-G_b_1 = tf.Variable(tf.zeros(shape=[28,28]))
-
-# Parameters for generator
-theta_G = [G_U_00, G_U_01, G_U_10, G_U_11, G_b_0, G_b_1]
-
-
-# Weight matrices and bias tensor forthe first and second tensor layer for the Encoder E
-E_U_00 = tf.Variable(normal_init([n_dim, 28]))
-E_U_01 = tf.Variable(normal_init([n_dim, 28]))
-E_b_0 = tf.Variable(tf.zeros(shape=[n_dim,n_dim]))
-
-E_U_10 = tf.Variable(normal_init([10, n_dim]))
-E_U_11 = tf.Variable(normal_init([10, n_dim]))
-E_b_1 = tf.Variable(tf.zeros(shape=[10,10]))
-
-# Parameters for generator
-theta_E = [E_U_00, E_U_01, E_U_10, E_U_11, E_b_0, E_b_1]
 
 def sample_z(shape):
     return np.random.uniform(-1., 1., size=shape)
 
 
+#Encoder
+E_U_00 = tf.Variable(normal_init([h_dim, 28]))
+E_U_01 = tf.Variable(normal_init([h_dim, 28]))
+E_b_0 = tf.Variable(tf.zeros(shape=[h_dim,h_dim]))
+E_U_10 = tf.Variable(normal_init([latent_dim, h_dim]))
+E_U_11 = tf.Variable(normal_init([latent_dim, h_dim]))
+E_b_1 = tf.Variable(tf.zeros(shape=[latent_dim,latent_dim]))
+def encoder(x):
+    out = tensor_layer(x, [E_U_00, E_U_01], E_b_0, tf.nn.relu)
+    out = tensor_layer(out, [E_U_10, E_U_11], E_b_1, tf.nn.relu)
+    return out
+
+theta_E = [E_U_00, E_U_01, E_U_10, E_U_11, E_b_0, E_b_1]    # Parameters for generator
+
+
+#Generator
+G_U_00 = tf.Variable(normal_init([h_dim, latent_dim]))
+G_U_01 = tf.Variable(normal_init([h_dim, latent_dim]))
+G_b_0 = tf.Variable(tf.zeros(shape=[h_dim,h_dim]))
+G_U_10 = tf.Variable(normal_init([28, h_dim]))
+G_U_11 = tf.Variable(normal_init([28, h_dim]))
+G_b_1 = tf.Variable(tf.zeros(shape=[28,28]))
 def generator(z):
-
-    # First Tensorized layer
-    out = tensor_layer(Z, [G_U_00, G_U_01], G_b_0, tf.nn.relu)
-
-    # Second Tensorized layer
+    out = tensor_layer(z, [G_U_00, G_U_01], G_b_0, tf.nn.relu)
     out = tensor_layer(out, [G_U_10, G_U_11], G_b_1, tf.nn.sigmoid)
-
     return out
 
-def encoder(z):
+theta_G = [G_U_00, G_U_01, G_U_10, G_U_11, G_b_0, G_b_1]    # Parameters for generator
 
-    # First Tensorized layer
-    out = tensor_layer(Z, [E_U_00, E_U_01], E_b_0, tf.nn.relu)
 
-    # Second Tensorized layer
-    out = tensor_layer(out, [E_U_10, E_U_11], E_b_1, tf.nn.sigmoid)
-
-    return out
-
+#Discriminator
+D_U_00 = tf.Variable(normal_init([h_dim, 28]))
+D_U_01 = tf.Variable(normal_init([h_dim, 28]))
+D_b_0 = tf.Variable(tf.zeros(shape=[h_dim,h_dim]))
+D_U_10 = tf.Variable(normal_init([1, h_dim]))
+D_U_11 = tf.Variable(normal_init([1, h_dim]))
+D_b_1 = tf.Variable(tf.zeros(shape=[1,1]))
 def discriminator(x):
-    # First Tensorized layer
     out = tensor_layer(x, [D_U_00, D_U_01], D_b_0, tf.nn.relu)
-
-    # Return the logit and prob reoresentation after sigmoid
     return tensor_layer(out, [D_U_10, D_U_11], D_b_1, tf.nn.sigmoid), tensor_layer(out, [D_U_10, D_U_11], D_b_1, identity)
+
+theta_D = [D_U_00, D_U_01, D_U_10, D_U_11, D_b_0, D_b_1]    # Parameters for discriminator
 
 
 def plot(samples):
@@ -120,25 +98,42 @@ def plot(samples):
 
 print("Total number of parameters: {}".format(get_number_parameters(theta_E+theta_G+theta_D)))
 
-G_sample = generator(Z)
-D_real, D_logit_real = discriminator(X)
-D_fake, D_logit_fake = discriminator(G_sample)
+#z = tf.placeholder(tf.float32, shape=[None, latent_dim ,latent_dim ], name='latent_variable')
+## Reconstruction Loss
+# encoding
+z = encoder(x_hat)
+# decoding
+y = generator(z)
+# loss
+marginal_likelihood = -tf.reduce_mean(tf.reduce_mean(tf.squared_difference(x,y)))
+theta_AE = [E_U_00, E_U_01, E_U_10, E_U_11, E_b_0, E_b_1, G_U_00, G_U_01, G_U_10, G_U_11, G_b_0, G_b_1]
+
+# GAN Loss
+
+z_real = tf.placeholder(tf.float32, shape=[None, latent_dim ,latent_dim ], name='prior_sample')
+
+z_fake = z
+D_real, D_real_logits = discriminator(z_real)
+D_fake, D_fake_logits = discriminator(z_fake)
+
 
 # D_loss = -tf.reduce_mean(tf.log(D_real) + tf.log(1. - D_fake))
 # G_loss = -tf.reduce_mean(tf.log(D_fake))
 
 # Alternative losses:
 # -------------------
-
-D_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=D_logit_real, labels=tf.ones_like(D_logit_real)))
-D_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=D_logit_fake, labels=tf.zeros_like(D_logit_fake)))
+D_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=D_real_logits, labels=tf.ones_like(D_real_logits)))
+D_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=D_fake_logits, labels=tf.zeros_like(D_fake_logits)))
 D_loss = D_loss_real + D_loss_fake
 
-G_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=D_logit_fake, labels=tf.ones_like(D_logit_fake)))
+G_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=D_fake_logits, labels=tf.ones_like(D_fake_logits)))
 
-#marginal_likelihood = -tf.reduce_mean(tf.reduce_mean(tf.squared_difference(Z,G_sample)))
-#theta_AE = [E_U_00, E_U_01, E_U_10, E_U_11, E_b_0, E_b_1,G_U_00, G_U_01, G_U_10, G_U_11, G_b_0, G_b_1]
-#AE_solver = tf.train.AdamOptimizer(learning_rate=lr, beta1=0.5).minimize(-  marginal_likelihood, var_list=theta_AE)
+marginal_likelihood = tf.reduce_mean(marginal_likelihood)
+D_loss = tf.reduce_mean(D_loss)
+G_loss = tf.reduce_mean(G_loss)
+
+
+AE_solver = tf.train.AdamOptimizer(learning_rate=lr, beta1=0.5).minimize(- marginal_likelihood, var_list=theta_AE)
 D_solver = tf.train.AdamOptimizer(learning_rate=lr, beta1=0.5).minimize(D_loss, var_list=theta_D)
 G_solver = tf.train.AdamOptimizer(learning_rate=lr, beta1=0.5).minimize(G_loss, var_list=theta_G)
 
@@ -153,21 +148,27 @@ if not os.path.exists('out/'):
 i = 0
 
 for it in range(1000000):
+    X_mb, _ = mnist.train.next_batch(mb_size)
+
     if it % 1000 == 0:
-        samples = sess.run(G_sample, feed_dict={Z: sample_z([16, z_dim, z_dim])})
+        samples = sess.run(y, feed_dict={x_hat: X_mb.reshape(mb_size, 28, 28), z_real: sample_z([mb_size, latent_dim, latent_dim])})
 
         fig = plot(samples)
         plt.savefig('out/{}.png'.format(str(i).zfill(3)), bbox_inches='tight')
         i += 1
         plt.close(fig)
 
-    X_mb, _ = mnist.train.next_batch(mb_size)
-    #_, loss_likelihood = sess.run( [AE_solver, - marginal_likelihood],feed_dict={X: X_mb.reshape(mb_size, 28, 28)})
-    _, D_loss_curr = sess.run([D_solver, D_loss],feed_dict={X: X_mb.reshape(mb_size, 28, 28), Z: sample_z([mb_size, z_dim, z_dim])})
-    _, G_loss_curr = sess.run([G_solver, G_loss], feed_dict={Z: sample_z([mb_size, z_dim, z_dim])})
+
+
+
+
+    _, loss_likelihood = sess.run([AE_solver, - marginal_likelihood],feed_dict={x_hat: X_mb.reshape(mb_size, 28, 28)})
+    _, d_loss = sess.run([D_solver, D_loss],feed_dict={x_hat: X_mb.reshape(mb_size, 28, 28), z_real: sample_z([mb_size, latent_dim, latent_dim])})
+    _, g_loss = sess.run([G_solver, G_loss], feed_dict={z_real: sample_z([mb_size, latent_dim, latent_dim])})
+    tot_loss = loss_likelihood + d_loss + g_loss
 
     if it % 1000 == 0:
         print('Iter: {}'.format(it))
-        print('D loss: {:.4}'. format(D_loss_curr))
-        print('G_loss: {:.4}'.format(G_loss_curr))
+        print('D loss: {:.4}'. format(d_loss))
+        print('G_loss: {:.4}'.format(d_loss))
         print('')
