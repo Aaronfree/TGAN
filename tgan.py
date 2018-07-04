@@ -74,8 +74,8 @@ D_b_0 = tf.Variable(tf.zeros(shape=[h_dim,h_dim]))
 D_U_10 = tf.Variable(normal_init([1, h_dim]))
 D_U_11 = tf.Variable(normal_init([1, h_dim]))
 D_b_1 = tf.Variable(tf.zeros(shape=[1,1]))
-def discriminator(x):
-    out = tensor_layer(x, [D_U_00, D_U_01], D_b_0, tf.nn.relu)
+def discriminator(z):
+    out = tensor_layer(z, [D_U_00, D_U_01], D_b_0, tf.nn.relu)
     return tensor_layer(out, [D_U_10, D_U_11], D_b_1, tf.nn.sigmoid), tensor_layer(out, [D_U_10, D_U_11], D_b_1, identity)
 
 theta_D = [D_U_00, D_U_01, D_U_10, D_U_11, D_b_0, D_b_1]    # Parameters for discriminator
@@ -109,13 +109,12 @@ marginal_likelihood = -tf.reduce_mean(tf.reduce_mean(tf.squared_difference(x,y))
 theta_AE = [E_U_00, E_U_01, E_U_10, E_U_11, E_b_0, E_b_1, G_U_00, G_U_01, G_U_10, G_U_11, G_b_0, G_b_1]
 
 # GAN Loss
-
+z_in = tf.placeholder(tf.float32, shape=[None,latent_dim ,latent_dim], name='latent_variable')
 z_real = tf.placeholder(tf.float32, shape=[None, latent_dim ,latent_dim ], name='prior_sample')
-
 z_fake = z
 D_real, D_real_logits = discriminator(z_real)
 D_fake, D_fake_logits = discriminator(z_fake)
-
+decoded = generator(z_in)
 
 # D_loss = -tf.reduce_mean(tf.log(D_real) + tf.log(1. - D_fake))
 # G_loss = -tf.reduce_mean(tf.log(D_fake))
@@ -133,7 +132,7 @@ neg_marginal_likelihood = - marginal_likelihood
 
 AE_solver = tf.train.AdamOptimizer(learning_rate=lr, beta1=0.5).minimize(neg_marginal_likelihood, var_list=theta_AE)
 D_solver = tf.train.AdamOptimizer(learning_rate=lr, beta1=0.5).minimize(D_loss, var_list=theta_D)
-G_solver = tf.train.AdamOptimizer(learning_rate=lr, beta1=0.5).minimize(G_loss, var_list=theta_G)
+G_solver = tf.train.AdamOptimizer(learning_rate=lr, beta1=0.5).minimize(G_loss, var_list=theta_E)
 
 mnist = input_data.read_data_sets('../MNIST_data', one_hot=True)
 
@@ -149,7 +148,7 @@ for it in range(1000000):
     X_mb, _ = mnist.train.next_batch(mb_size)
 
     if it % 1000 == 0:
-        samples = sess.run(y, feed_dict={x_hat: X_mb.reshape(mb_size, 28, 28), z_real: sample_z([mb_size, latent_dim, latent_dim])})
+        samples = sess.run(decoded, feed_dict={z_in: sample_z([16, latent_dim, latent_dim])})
 
         fig = plot(samples)
         plt.savefig('out/{}.png'.format(str(i).zfill(3)), bbox_inches='tight')
