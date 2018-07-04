@@ -68,8 +68,8 @@ theta_G = [G_U_00, G_U_01, G_U_10, G_U_11, G_b_0, G_b_1]    # Parameters for gen
 
 
 #Discriminator
-D_U_00 = tf.Variable(normal_init([h_dim, 28]))
-D_U_01 = tf.Variable(normal_init([h_dim, 28]))
+D_U_00 = tf.Variable(normal_init([h_dim, latent_dim ]))
+D_U_01 = tf.Variable(normal_init([h_dim, latent_dim ]))
 D_b_0 = tf.Variable(tf.zeros(shape=[h_dim,h_dim]))
 D_U_10 = tf.Variable(normal_init([1, h_dim]))
 D_U_11 = tf.Variable(normal_init([1, h_dim]))
@@ -128,12 +128,10 @@ D_loss = D_loss_real + D_loss_fake
 
 G_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=D_fake_logits, labels=tf.ones_like(D_fake_logits)))
 
-marginal_likelihood = tf.reduce_mean(marginal_likelihood)
-D_loss = tf.reduce_mean(D_loss)
-G_loss = tf.reduce_mean(G_loss)
+neg_marginal_likelihood = - marginal_likelihood
 
 
-AE_solver = tf.train.AdamOptimizer(learning_rate=lr, beta1=0.5).minimize(- marginal_likelihood, var_list=theta_AE)
+AE_solver = tf.train.AdamOptimizer(learning_rate=lr, beta1=0.5).minimize(neg_marginal_likelihood, var_list=theta_AE)
 D_solver = tf.train.AdamOptimizer(learning_rate=lr, beta1=0.5).minimize(D_loss, var_list=theta_D)
 G_solver = tf.train.AdamOptimizer(learning_rate=lr, beta1=0.5).minimize(G_loss, var_list=theta_G)
 
@@ -162,13 +160,15 @@ for it in range(1000000):
 
 
 
-    _, loss_likelihood = sess.run([AE_solver, - marginal_likelihood],feed_dict={x_hat: X_mb.reshape(mb_size, 28, 28)})
-    _, d_loss = sess.run([D_solver, D_loss],feed_dict={x_hat: X_mb.reshape(mb_size, 28, 28), z_real: sample_z([mb_size, latent_dim, latent_dim])})
-    _, g_loss = sess.run([G_solver, G_loss], feed_dict={z_real: sample_z([mb_size, latent_dim, latent_dim])})
+    _, loss_likelihood = sess.run([AE_solver, neg_marginal_likelihood],feed_dict={x_hat: X_mb.reshape(mb_size, 28, 28),x: X_mb.reshape(mb_size, 28, 28),z_real: sample_z([mb_size, latent_dim, latent_dim]) })
+    _, d_loss = sess.run([D_solver, D_loss],feed_dict={x_hat: X_mb.reshape(mb_size, 28, 28),x: X_mb.reshape(mb_size, 28, 28),z_real: sample_z([mb_size, latent_dim, latent_dim]) })
+    _, g_loss = sess.run([G_solver, G_loss], feed_dict={x_hat: X_mb.reshape(mb_size, 28, 28),x: X_mb.reshape(mb_size, 28, 28),z_real: sample_z([mb_size, latent_dim, latent_dim]) })
     tot_loss = loss_likelihood + d_loss + g_loss
 
     if it % 1000 == 0:
         print('Iter: {}'.format(it))
+        print('AE loss: {:.4}'.format(loss_likelihood))
         print('D loss: {:.4}'. format(d_loss))
         print('G_loss: {:.4}'.format(d_loss))
+        print('total_loss: {:.4}'.format(tot_loss))
         print('')
