@@ -13,19 +13,19 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
 # Size of the batch
-mb_size = 100
+mb_size = 128
 
 # Dimension of the prior
 #z_dim = 10
 
 # Size of the hidden layer
-h_dim = 35
+h_dim = 72
 
 # Size of latent dim
-latent_dim = 15
+latent_dim = 14
 
 # Learning Rate
-lr = 5e-3
+lr = 1e-3
 
 # The input X
 x_hat = tf.placeholder(tf.float32, shape=[None,28, 28], name='input_img')
@@ -148,7 +148,7 @@ for it in range(1000000):
     X_mb, _ = mnist.train.next_batch(mb_size)
 
     if it % 1000 == 0:
-        samples = sess.run(decoded, feed_dict={z_in: sample_z([16, latent_dim, latent_dim])})
+        samples = sess.run(y, feed_dict={x_hat: X_mb.reshape(mb_size, 28, 28)[0:16,:,:]})
 
         fig = plot(samples)
         plt.savefig('out/{}.png'.format(str(i).zfill(3)), bbox_inches='tight')
